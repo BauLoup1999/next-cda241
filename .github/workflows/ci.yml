@@ -11,42 +11,64 @@ on:
       - master
 
 jobs:
-  build-and-test:
-    name: Build et E2E tests
+  build:
+    name: Build Next.js
     runs-on: ubuntu-latest
 
     steps:
-      # 1. On récupère le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2. On installe Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 3. Installation des dépendances
       - name: Installation des dépendances
         run: npm ci
 
-      # 4. Build Next.js
       - name: Build Next.js
         run: npm run build
 
-      # 5. Démarrage du serveur Next.js (mode production)
-      - name: Démarrage du serveur Next.js
+      - name: Upload du dossier .next
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: .next
+
+  test:
+    name: E2E tests Cypress
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du dépôt
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Installation des dépendances
+        run: npm ci
+
+      - name: Télécharger l’artifact de build
+        uses: actions/download-artifact@v3
+        with:
+          name: next-build
+          path: ./
+
+      - name: Démarrage du serveur Next.js (mode production)
         run: |
           nohup npm run start &
           npx wait-on http://localhost:3000
         env:
           NODE_ENV: production
 
-      # 6. Exécution des tests Cypress
       - name: Exécution des tests Cypress
         run: npx cypress run
 
-      # 7. Upload des vidéos Cypress en tant qu'artifact
       - name: Upload des vidéos Cypress
         uses: actions/upload-artifact@v4
         with:
