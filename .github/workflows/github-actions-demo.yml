@@ -14,6 +14,7 @@ jobs:
   build-and-test:
     name: Build et E2E tests
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout du dépôt
         uses: actions/checkout@v3
@@ -21,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'   
+          node-version: '18.x'
 
       - name: Installation des dépendances
         run: npm ci
@@ -29,13 +30,19 @@ jobs:
       - name: Build Next.js
         run: npm run build
 
-    
       - name: Démarrage du serveur Next.js
         run: |
-          nohup npm run start &        # lance 'next start' d'office (script défini dans package.json)
-          npx wait-on http://localhost:3000  # attend que le serveur réponde sur le port 3000
+          nohup npm run start &
+          npx wait-on http://localhost:3000
         env:
           NODE_ENV: production
 
       - name: Exécution des tests Cypress
         run: npx cypress run
+
+      - name: Upload des vidéos Cypress
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: cypress-videos
+          path: cypress/videos
