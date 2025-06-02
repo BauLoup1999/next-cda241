@@ -16,20 +16,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. On récupère le code
       - name: Checkout du dépôt
         uses: actions/checkout@v3
 
+      # 2. On installe Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
+      # 3. Installation des dépendances
       - name: Installation des dépendances
         run: npm ci
 
+      # 4. Build Next.js
       - name: Build Next.js
         run: npm run build
 
+      # 5. Démarrage du serveur Next.js (mode production)
       - name: Démarrage du serveur Next.js
         run: |
           nohup npm run start &
@@ -37,11 +42,12 @@ jobs:
         env:
           NODE_ENV: production
 
+      # 6. Exécution des tests Cypress
       - name: Exécution des tests Cypress
         run: npx cypress run
 
+      # 7. Upload des vidéos Cypress en tant qu'artifact
       - name: Upload des vidéos Cypress
-        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: cypress-videos
