@@ -16,9 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1) On récupère le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
+      # 2) Cache node_modules (build)
       - name: Cache node_modules (build)
         id: cache-node-build
         uses: actions/cache@v3
@@ -28,15 +30,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-modules-
 
+      # 3) Setup Node.js
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
+      # 4) Installation des dépendances (build) uniquement si le cache est manquant
       - name: Installation des dépendances (build)
         if: steps.cache-node-build.outputs.cache-hit != 'true'
         run: npm ci
 
+      # 5) Build Next.js
       - name: Build Next.js
         run: npm run build
 
@@ -46,9 +51,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1) On récupère le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
+      # 2) Cache node_modules (test) — même key que dans le build
       - name: Cache node_modules (test)
         id: cache-node-test
         uses: actions/cache@v3
@@ -58,28 +65,50 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-modules-
 
+      # 3) Cache du binaire Cypress
+      - name: Cache Cypress binaire
+        id: cache-cypress-binary
+        uses: actions/cache@v3
+        with:
+          # Ce chemin regroupe les binaires téléchargés par Cypress
+          path: ~/.cache/Cypress
+          key: ${{ runner.os }}-cypress-binary-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-cypress-binary-
+
+      # 4) Setup Node.js
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
+      # 5) Installation des dépendances (test) si le cache était manquant
       - name: Installation des dépendances (test)
         if: steps.cache-node-test.outputs.cache-hit != 'true'
         run: npm ci
 
+      # 6) Build Next.js (recréation de .next) pour que le serveur puisse démarrer
       - name: Build Next.js (recréation de .next)
         run: npm run build
 
-      - name: Démarrage du serveur Next.js (mode production)
+      # 7) Installation explicite du binaire Cypress si le cache était manquant
+      - name: Install Cypress binary
+        if: steps.cache-cypress-binary.outputs.cache-hit != 'true'
+        run: npx cypress install
+
+      # 8) Démarrage du serveur Next.js (mode production)
+      - name: Démarrage du serveur Next.js
         run: |
           nohup npm run start &
           npx wait-on http://localhost:3000
         env:
           NODE_ENV: production
 
+      # 9) Exécution des tests Cypress
       - name: Exécution des tests Cypress
         run: npx cypress run
 
+      # 10) Upload des vidéos Cypress
       - name: Upload des vidéos Cypress
         uses: actions/upload-artifact@v4
         with:
