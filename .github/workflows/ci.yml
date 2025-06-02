@@ -19,7 +19,7 @@ jobs:
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
@@ -27,17 +27,17 @@ jobs:
       - name: Installation des dépendances
         run: npm ci
 
-      - name: Build Next.js
+      - name: Build Next.js et lister tout (y compris .next)
         run: |
           npm run build
-          echo "==> LISTE DES FICHIERS APRÈS BUILD :"
-          ls -R .
+          echo "=== Contenu racine après la build (incluant .next) ==="
+          ls -Ra .
 
       - name: Upload du dossier .next
         uses: actions/upload-artifact@v4
         with:
           name: next-build
-          path: .next
+          path: .next/**
 
   test:
     name: E2E tests Cypress
@@ -48,7 +48,7 @@ jobs:
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
