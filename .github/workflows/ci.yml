@@ -12,55 +12,45 @@ on:
 
 jobs:
   build:
-    name: Build Next.js (vérification rapide)
+    name: Build 
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Récupère le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2) Installe Node.js v18.x
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 3) Installe les dépendances
       - name: Installation des dépendances
         run: npm ci
 
-      # 4) Fait le build Next.js pour vérifier que le build passe sans erreur
       - name: Build Next.js (vérification)
         run: |
           npm run build
-        # note: on ne liste pas .next ici, on se contente de s'assurer que la build réussit.
 
   test:
-    name: E2E tests Cypress
+    name: Tests
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Récupère de nouveau le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2) Installe Node.js v18.x
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 3) Installe les dépendances
       - name: Installation des dépendances
         run: npm ci
 
-      # 4) Rebuild Next.js pour recréer le dossier .next/ dans ce runner
       - name: Build Next.js (recréation de .next)
         run: npm run build
 
-      # 5) Démarre le serveur Next.js (production) en arrière-plan
       - name: Démarrage du serveur Next.js (mode production)
         run: |
           nohup npm run start &
@@ -68,11 +58,9 @@ jobs:
         env:
           NODE_ENV: production
 
-      # 6) Exécute les tests Cypress
       - name: Exécution des tests Cypress
         run: npx cypress run
 
-      # 7) (Optionnel) Upload des vidéos Cypress
       - name: Upload des vidéos Cypress
         uses: actions/upload-artifact@v4
         with:
