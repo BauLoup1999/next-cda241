@@ -12,27 +12,36 @@ on:
 
 jobs:
   build:
-    name: Build 
+    name: Build Next.js
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
+      - name: Cache node_modules (build)
+        id: cache-node-build
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      - name: Installation des dépendances
+      - name: Installation des dépendances (build)
+        if: steps.cache-node-build.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Build Next.js (vérification)
-        run: |
-          npm run build
+      - name: Build Next.js
+        run: npm run build
 
   test:
-    name: Tests
+    name: Tests Cypress
     needs: build
     runs-on: ubuntu-latest
 
@@ -40,12 +49,22 @@ jobs:
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
+      - name: Cache node_modules (test)
+        id: cache-node-test
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      - name: Installation des dépendances
+      - name: Installation des dépendances (test)
+        if: steps.cache-node-test.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Build Next.js (recréation de .next)
