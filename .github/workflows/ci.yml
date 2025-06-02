@@ -16,27 +16,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout du dépôt
-      - name: Checkout
+      - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2. Installation de Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 3. Installation des dépendances
-      - name: npm ci
+      - name: Installation des dépendances
         run: npm ci
 
-      # 4. Build Next.js
       - name: Build Next.js
         run: npm run build
 
-      # 5. Upload du dossier .next en tant qu'artifact
-      - name: Upload du build (.next)
-        uses: actions/upload-artifact@v2
+      - name: Upload du dossier .next
+        uses: actions/upload-artifact@v4
         with:
           name: next-build
           path: .next
@@ -47,42 +42,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout du dépôt
-      - name: Checkout
+      - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2. Installation de Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 3. Installation des dépendances
-      - name: npm ci
+      - name: Installation des dépendances
         run: npm ci
 
-      # 4. Télécharger l’artifact next-build
-      - name: Download build artifact
-        uses: actions/download-artifact@v2
+      - name: Télécharger l’artifact de build
+        uses: actions/download-artifact@v4
         with:
           name: next-build
           path: ./
 
-      # 5. Démarrage du serveur Next.js (en production)
-      - name: Start Next.js en prod
+      - name: Démarrage du serveur Next.js (mode production)
         run: |
           nohup npm run start &
           npx wait-on http://localhost:3000
         env:
           NODE_ENV: production
 
-      # 6. Exécution des tests Cypress
-      - name: Run Cypress
+      - name: Exécution des tests Cypress
         run: npx cypress run
 
-      # 7. Upload des vidéos Cypress
       - name: Upload des vidéos Cypress
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: cypress-videos
           path: cypress/videos
