@@ -30,8 +30,7 @@ jobs:
       - name: Build Next.js
         run: |
           npm run build
-          # (optionnel) debug : afficher les fichiers pour s'assurer que .next existe
-          echo "Contenu après build :"
+          echo "==> LISTE DES FICHIERS APRÈS BUILD :"
           ls -R .
 
       - name: Upload du dossier .next
@@ -65,7 +64,7 @@ jobs:
 
       - name: Démarrage du serveur Next.js (mode production)
         run: |
-          nohup npm run start &          # Démarre le serveur en arrière-plan
+          nohup npm run start &
           npx wait-on http://localhost:3000
         env:
           NODE_ENV: production
