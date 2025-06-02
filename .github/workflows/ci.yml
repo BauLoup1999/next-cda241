@@ -12,68 +12,55 @@ on:
 
 jobs:
   build:
-    name: Build Next.js
+    name: Build Next.js (vérification rapide)
     runs-on: ubuntu-latest
 
     steps:
-      # 1) On récupère le code
+      # 1) Récupère le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2) On installe Node.js v18
+      # 2) Installe Node.js v18.x
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 3) On installe les dépendances
+      # 3) Installe les dépendances
       - name: Installation des dépendances
         run: npm ci
 
-      # 4) On build Next.js (génère .next/)
-      - name: Build Next.js
-        run: npm run build
+      # 4) Fait le build Next.js pour vérifier que le build passe sans erreur
+      - name: Build Next.js (vérification)
+        run: |
+          npm run build
+        # note: on ne liste pas .next ici, on se contente de s'assurer que la build réussit.
 
-      # 5) On uploade tout le dossier .next/ généré
-      - name: Upload du dossier .next
-        uses: actions/upload-artifact@v4
-        with:
-          name: next-build
-          path: .next
-          # NB : pas de wildcard “/**” ici, simplement “.next” suffit
-          #     upload-artifact prendra par défaut tout le contenu du dossier .next/
-          
   test:
     name: E2E tests Cypress
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      # 1) On récupère de nouveau le code (nécessaire pour exécuter Cypress,
-      #    même si on aurait pu reporter l'extraction de .next/ seul, 
-      #    mais c'est plus simple de repartir du checkout)
+      # 1) Récupère de nouveau le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2) Node.js v18
+      # 2) Installe Node.js v18.x
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 3) On réinstalle les dépendances
+      # 3) Installe les dépendances
       - name: Installation des dépendances
         run: npm ci
 
-      # 4) On télécharge l'artefact “next-build” (le .next/ généré précédemment)
-      - name: Télécharger l’artifact de build
-        uses: actions/download-artifact@v4
-        with:
-          name: next-build
-          path: ./
-          # => ceci va recréer le dossier “.next/” à la racine du workspace
+      # 4) Rebuild Next.js pour recréer le dossier .next/ dans ce runner
+      - name: Build Next.js (recréation de .next)
+        run: npm run build
 
-      # 5) On démarre le serveur Next.js en production, en arrière-plan
+      # 5) Démarre le serveur Next.js (production) en arrière-plan
       - name: Démarrage du serveur Next.js (mode production)
         run: |
           nohup npm run start &
@@ -81,11 +68,11 @@ jobs:
         env:
           NODE_ENV: production
 
-      # 6) On exécute les tests E2E avec Cypress
+      # 6) Exécute les tests Cypress
       - name: Exécution des tests Cypress
         run: npx cypress run
 
-      # 7) (Optionnel) On uploade les vidéos Cypress
+      # 7) (Optionnel) Upload des vidéos Cypress
       - name: Upload des vidéos Cypress
         uses: actions/upload-artifact@v4
         with:
