@@ -30,8 +30,8 @@ jobs:
       - name: Build Next.js
         run: npm run build
 
-      - name: Upload du dossier .next
-        uses: actions/upload-artifact@v4
+      - name: Upload du dossier .next en artifact
+        uses: actions/upload-artifact@v3
         with:
           name: next-build
           path: .next
@@ -69,8 +69,8 @@ jobs:
       - name: Exécution des tests Cypress
         run: npx cypress run
 
-      - name: Upload des vidéos Cypress
-        uses: actions/upload-artifact@v4
+      - name: Upload des vidéos Cypress en tant qu’artifact
+        uses: actions/upload-artifact@v3
         with:
           name: cypress-videos
           path: cypress/videos
