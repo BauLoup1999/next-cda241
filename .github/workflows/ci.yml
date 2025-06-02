@@ -12,67 +12,77 @@ on:
 
 jobs:
   build:
-    name: Build Next.js        # Identifiant 'build' (job id) --> 'needs: build' dans l'autre job fait référence à cet id
+    name: Build Next.js
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout du dépôt
+      # 1. Checkout du dépôt
+      - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Installation de Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      - name: Installation des dépendances
+      # 3. Installation des dépendances
+      - name: npm ci
         run: npm ci
 
+      # 4. Build Next.js
       - name: Build Next.js
         run: npm run build
 
-      # ↑ Après 'npm run build', on doit UPLoADER exactement le dossier ".next" sous le nom d’artifact 'next-build'
-      - name: Upload du dossier .next en artifact
-        uses: actions/upload-artifact@v3   # ← bien @v3 ici
+      # 5. Upload du dossier .next en tant qu'artifact
+      - name: Upload du build (.next)
+        uses: actions/upload-artifact@v2
         with:
-          name: next-build                 # ← le même nom que celui que l’on téléchargera ensuite
-          path: .next                      
+          name: next-build
+          path: .next
 
   test:
     name: E2E tests Cypress
-    needs: build                         # ← on attend que 'build' soit terminé AVANT de lancer ce job
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout du dépôt
+      # 1. Checkout du dépôt
+      - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Installation de Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      - name: Installation des dépendances
+      # 3. Installation des dépendances
+      - name: npm ci
         run: npm ci
 
-      # ← TÉLÉCHARGE l’artifact 'next-build' UPLoADé par le job build
-      - name: Télécharger l’artifact de build
-        uses: actions/download-artifact@v3  # ← bien @v3 aussi
+      # 4. Télécharger l’artifact next-build
+      - name: Download build artifact
+        uses: actions/download-artifact@v2
         with:
           name: next-build
-          path: ./                           # on extrait dans le répertoire racine, donc on retrouvera ".next/"
+          path: ./
 
-      - name: Démarrage du serveur Next.js (mode production)
+      # 5. Démarrage du serveur Next.js (en production)
+      - name: Start Next.js en prod
         run: |
-          nohup npm run start &             # démarre 'next start' en background
-          npx wait-on http://localhost:3000  # attend que le serveur soit disponible
+          nohup npm run start &
+          npx wait-on http://localhost:3000
         env:
           NODE_ENV: production
 
-      - name: Exécution des tests Cypress
+      # 6. Exécution des tests Cypress
+      - name: Run Cypress
         run: npx cypress run
 
-      - name: Upload des vidéos Cypress en tant qu’artifact
-        uses: actions/upload-artifact@v3
+      # 7. Upload des vidéos Cypress
+      - name: Upload des vidéos Cypress
+        uses: actions/upload-artifact@v2
         with:
           name: cypress-videos
           path: cypress/videos
