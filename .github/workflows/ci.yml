@@ -114,7 +114,6 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          # Désactive StrictHostKeyChecking pour ne pas refuser le host si nouveau
           echo -e "Host ${{ secrets.SSH_HOST }}\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
@@ -123,24 +122,33 @@ jobs:
       - name: Déployer sur la VM via SSH
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ secrets.SSH_HOST }}       # ex. 44.196.80.112
-          username: ${{ secrets.SSH_USER }}   # ex. ubuntu
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # Chemin où l’on veut déployer l’app
             DEPLOY_DIR="/var/www/mon-app"
 
-            # Si le dossier n'existe pas encore, on clone le repo
+            # 1. Créer le dossier si nécessaire, avec sudo pour éviter les problèmes de permission
             if [ ! -d "$DEPLOY_DIR" ]; then
-              echo "Le dossier $DEPLOY_DIR n'existe pas. Clonage du dépôt..."
-              git clone https://github.com/BauLoup1999/next-cda241.git "$DEPLOY_DIR"
+              echo "Création du dossier $DEPLOY_DIR avec sudo..."
+              sudo mkdir -p "$DEPLOY_DIR"
+              sudo chown ubuntu:ubuntu "$DEPLOY_DIR"
             fi
 
-            # Se placer dans le dossier
+            # 2. Se placer dans le dossier de déploiement
             cd "$DEPLOY_DIR" || exit 1
 
-            # S'assurer d'être sur la branche correcte (master ou main)
+            # 3. Cloner ou mettre à jour le dépôt
+            if [ ! -d ".git" ]; then
+              echo "Repository non trouvé dans $DEPLOY_DIR. Clonage en cours..."
+              git clone https://github.com/BauLoup1999/next-cda241.git "$DEPLOY_DIR"
+              cd "$DEPLOY_DIR"
+            else
+              echo "Repository trouvé. Mise à jour du code..."
+            fi
+
+            # 4. Se positionner sur la branche correcte et récupérer les dernières modifications
             if [ "${{ github.ref }}" = "refs/heads/master" ]; then
               git checkout master
               git pull origin master
@@ -149,22 +157,20 @@ jobs:
               git pull origin main
             fi
 
-            # Installer/mettre à jour les dépendances
+            # 5. Installer/mettre à jour les dépendances
             npm ci
 
-            # Rebuilder l’application Next.js
+            # 6. Rebuilder l’application Next.js
             npm run build
 
-            # Relancer l’application en prod
-            #  → Méthode 1 : npm run start
+            # 7. Relancer l’application en prod
+            # → Option A : npm run start (en killant l’ancienne instance si besoin)
             echo "Redémarrage de l’application avec npm run start..."
             pkill -f "npm run start" || true
             nohup npm run start &
 
-            #  → Méthode 2 (optionnelle, si vous utilisez PM2 
-            #     et que celui-ci est installé globalement) :
+            # → Option B (si vous préférez PM2, et que PM2 est installé globalement) :
             # echo "Redémarrage avec PM2..."
             # pm2 start npm --name "mon-app" -- run start --update-env
 
             echo "Déploiement terminé."
-
