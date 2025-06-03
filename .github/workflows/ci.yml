@@ -1,172 +1,75 @@
-name: CI – build + tests + deploy
-
-on:
-  push:
-    branches:
-      - master
-      - main
-  pull_request:
-    branches:
-      - master
-      - main
+on: [push]
 
 jobs:
   build:
-    name: Build Next.js
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout du dépôt
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Cache node_modules (build)
-        id: cache-node-build
-        uses: actions/cache@v3
+      - name: Cache node_modules
+        uses: actions/cache@v4
         with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
+          path: |
+            node_modules
+            /home/runner/.cache/Cypress
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 
-      - name: Setup Node.js (v18.x)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18.x'
-
-      - name: Installation des dépendances (build)
-        if: steps.cache-node-build.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - name: Build Next.js
-        run: npm run build
+      - run: npm install
+      - run: npm run build
 
   test:
-    name: Tests Cypress
-    needs: build
     runs-on: ubuntu-latest
-
+    needs: build
+    strategy:
+      matrix:
+        browser: ['chrome', 'edge']
     steps:
-      - name: Checkout du dépôt
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Cache node_modules (test)
-        id: cache-node-test
-        uses: actions/cache@v3
+      - name: Cache node_modules
+        uses: actions/cache/restore@v4
         with:
-          path: node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
+          path: |
+            node_modules
+            /home/runner/.cache/Cypress
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 
-      - name: Cache Cypress binaire
-        id: cache-cypress-binary
-        uses: actions/cache@v3
+      - uses: cypress-io/github-action@v6
         with:
-          path: ~/.cache/Cypress
-          key: ${{ runner.os }}-cypress-binary-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-cypress-binary-
+          install: false
+          start: npm run dev
+          browser: ${{ matrix.browser }}
 
-      - name: Setup Node.js (v18.x)
-        uses: actions/setup-node@v4
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          node-version: '18.x'
-
-      - name: Installation des dépendances (test)
-        if: steps.cache-node-test.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - name: Build Next.js (recréation de .next)
-        run: npm run build
-
-      - name: Install Cypress binary
-        if: steps.cache-cypress-binary.outputs.cache-hit != 'true'
-        run: npx cypress install
-
-      - name: Démarrage du serveur Next.js pour tests
-        run: |
-          nohup npm run start > /dev/null 2>&1 &
-          npx wait-on http://localhost:3000
-        env:
-          NODE_ENV: production
-
-      - name: Exécution des tests Cypress
-        run: npx cypress run
-
-      - name: Upload des vidéos Cypress
-        uses: actions/upload-artifact@v4
-        with:
-          name: cypress-videos
+          name: cypress-videos-${{ matrix.browser }}
           path: cypress/videos
+          retention-days: 5
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cypress-screenshots-${{ matrix.browser }}
+          path: cypress/screenshots
+          retention-days: 5
+
 
   deploy:
-    name: Déploiement en prod
-    needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-
+    if: github.ref == 'refs/heads/master'
     steps:
-      - name: Checkout du dépôt
-        uses: actions/checkout@v4
-
-      - name: Configurer la clé SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          echo -e "Host ${{ secrets.SSH_HOST }}\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-        env:
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-
-      - name: Déployer sur la VM via SSH
-        uses: appleboy/ssh-action@v1.2.2
+      - name: Déployer en production via SSH
+        uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: 22
+          port: 22 
+          debug: true
           script: |
-            DEPLOY_DIR="/var/www/mon-app"
-
-            # 1. Créer le dossier si nécessaire, avec sudo pour éviter les permissions
-            if [ ! -d "$DEPLOY_DIR" ]; then
-              echo "Création du dossier $DEPLOY_DIR avec sudo..."
-              sudo mkdir -p "$DEPLOY_DIR"
-              sudo chown ubuntu:ubuntu "$DEPLOY_DIR"
-            fi
-
-            # 2. Se placer dans le dossier de déploiement
-            cd "$DEPLOY_DIR" || exit 1
-
-            # 3. Cloner ou mettre à jour le dépôt
-            if [ ! -d ".git" ]; then
-              echo "Repository non trouvé dans $DEPLOY_DIR. Clonage en cours..."
-              git clone https://github.com/BauLoup1999/next-cda241.git "$DEPLOY_DIR"
-              cd "$DEPLOY_DIR"
-            else
-              echo "Repository trouvé. Mise à jour du code..."
-            fi
-
-            # 4. Se positionner sur la branche correcte et récupérer les dernières modifications
-            if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-              git checkout master
-              git pull origin master
-            else
-              git checkout main
-              git pull origin main
-            fi
-
-            # 5. Installer/mettre à jour les dépendances
-            npm ci
-
-            # 6. Rebuilder l’application Next.js
+            cd next-cda241/
+            git pull origin master
+            npm install
             npm run build
-
-            # 7. Relancer l’application en prod
-            echo "Redémarrage de l’application avec npm run start..."
-            # On kill l’ancienne instance si elle existe, puis on démarre en arrière-plan
-            pkill -f "npm run start" || true
-            nohup npm run start > /dev/null 2>&1 &
-
-            echo "Déploiement terminé."
+            pm2 restart all         
