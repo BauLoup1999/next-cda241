@@ -83,9 +83,9 @@ jobs:
         if: steps.cache-cypress-binary.outputs.cache-hit != 'true'
         run: npx cypress install
 
-      - name: Démarrage du serveur Next.js
+      - name: Démarrage du serveur Next.js pour tests
         run: |
-          nohup npm run start &
+          nohup npm run start > /dev/null 2>&1 &
           npx wait-on http://localhost:3000
         env:
           NODE_ENV: production
@@ -129,7 +129,7 @@ jobs:
           script: |
             DEPLOY_DIR="/var/www/mon-app"
 
-            # 1. Créer le dossier si nécessaire, avec sudo pour éviter les problèmes de permission
+            # 1. Créer le dossier si nécessaire, avec sudo pour éviter les permissions
             if [ ! -d "$DEPLOY_DIR" ]; then
               echo "Création du dossier $DEPLOY_DIR avec sudo..."
               sudo mkdir -p "$DEPLOY_DIR"
@@ -164,13 +164,9 @@ jobs:
             npm run build
 
             # 7. Relancer l’application en prod
-            # → Option A : npm run start (en killant l’ancienne instance si besoin)
             echo "Redémarrage de l’application avec npm run start..."
+            # On kill l’ancienne instance si elle existe, puis on démarre en arrière-plan
             pkill -f "npm run start" || true
-            nohup npm run start &
-
-            # → Option B (si vous préférez PM2, et que PM2 est installé globalement) :
-            # echo "Redémarrage avec PM2..."
-            # pm2 start npm --name "mon-app" -- run start --update-env
+            nohup npm run start > /dev/null 2>&1 &
 
             echo "Déploiement terminé."
