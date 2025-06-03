@@ -1,0 +1,24 @@
+name: Debug SSH vers Prod
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ssh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurer la clé SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          # On désactive StrictHostKeyChecking pour ne pas bloquer si nouveau serveur
+          echo -e "Host ${{ secrets.SSH_HOST }}\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+
+      - name: Tester la connexion SSH
+        run: |
+          ssh -o ConnectTimeout=10 "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "echo 'Connexion SSH OK' && uname -a"

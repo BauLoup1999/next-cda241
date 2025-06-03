@@ -3,12 +3,12 @@ name: CI – build + tests + deploy
 on:
   push:
     branches:
-      - main
       - master
+      - main
   pull_request:
     branches:
-      - main
       - master
+      - main
 
 jobs:
   build:
@@ -103,7 +103,8 @@ jobs:
     name: Déploiement en prod
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')  
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+
     steps:
       - name: Checkout du dépôt
         uses: actions/checkout@v4
@@ -113,36 +114,21 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          # Optionnel : désactiver la vérification des hôtes si tu n'as pas ajouté manuellement le serveur dans known_hosts
           echo -e "Host ${{ secrets.SSH_HOST }}\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
         env:
           SSH_KEY: ${{ secrets.SSH_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
 
-      - name: Déployer sur le serveur via SSH
-        uses: appleboy/ssh-action@master
+      - name: Déployer sur la VM via SSH
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          port: 22
           script: |
-            # → Ici, adapte le chemin vers ton répertoire de production
             cd /var/www/mon-app
-
-            # Option A : Utiliser git pull directement (si le repo est cloné en prod)
-            git pull origin main
-
-            # Option B : Si tu préfères synchroniser avec rsync, remplacer par :
-            # rsync -avz --delete ./ user@serveur:/var/www/mon-app
-
-            # Installer / mettre à jour les dépendances
+            git pull origin ${{ github.ref == 'refs/heads/master' && 'master' || 'main' }}
             npm ci
-
-            # Rebuild (Next.js ou autre)
             npm run build
-
-            # Redémarrer le serveur : exemple avec PM2
             pm2 restart mon-app
-
-            # Si tu utilises systemd, ça peut être :
-            # sudo systemctl restart mon-app.service
