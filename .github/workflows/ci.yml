@@ -129,9 +129,8 @@ jobs:
           script: |
             DEPLOY_DIR="/var/www/mon-app"
 
-            # 1. Créer le dossier si nécessaire, avec sudo pour éviter les permissions
+            # 1. Créer le dossier si nécessaire (avec sudo)
             if [ ! -d "$DEPLOY_DIR" ]; then
-              echo "Création du dossier $DEPLOY_DIR avec sudo..."
               sudo mkdir -p "$DEPLOY_DIR"
               sudo chown ubuntu:ubuntu "$DEPLOY_DIR"
             fi
@@ -141,32 +140,20 @@ jobs:
 
             # 3. Cloner ou mettre à jour le dépôt
             if [ ! -d ".git" ]; then
-              echo "Repository non trouvé dans $DEPLOY_DIR. Clonage en cours..."
               git clone https://github.com/BauLoup1999/next-cda241.git "$DEPLOY_DIR"
               cd "$DEPLOY_DIR"
             else
-              echo "Repository trouvé. Mise à jour du code..."
+              git checkout master && git pull origin master
             fi
 
-            # 4. Se positionner sur la branche correcte et récupérer les dernières modifications
-            if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-              git checkout master
-              git pull origin master
-            else
-              git checkout main
-              git pull origin main
-            fi
-
-            # 5. Installer/mettre à jour les dépendances
+            # 4. Installer/mettre à jour les dépendances
             npm ci
 
-            # 6. Rebuilder l’application Next.js
+            # 5. Rebuilder l’application Next.js
             npm run build
 
-            # 7. Relancer l’application en prod
-            echo "Redémarrage de l’application avec npm run start..."
-            # On kill l’ancienne instance si elle existe, puis on démarre en arrière-plan
-            pkill -f "npm run start" || true
-            nohup npm run start > /dev/null 2>&1 &
+            # 6. Démarrer ou redémarrer l’application avec PM2
+            pm2 start npm --name "mon-app" -- run start --update-env || \
+            pm2 restart mon-app
 
-            echo "Déploiement terminé."
+            exit 0
