@@ -1,4 +1,4 @@
-name: CI – build + tests
+name: CI – build + tests + deploy
 
 on:
   push:
@@ -16,11 +16,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) On récupère le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2) Cache node_modules (build)
       - name: Cache node_modules (build)
         id: cache-node-build
         uses: actions/cache@v3
@@ -30,18 +28,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-modules-
 
-      # 3) Setup Node.js
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 4) Installation des dépendances (build) uniquement si le cache est manquant
       - name: Installation des dépendances (build)
         if: steps.cache-node-build.outputs.cache-hit != 'true'
         run: npm ci
 
-      # 5) Build Next.js
       - name: Build Next.js
         run: npm run build
 
@@ -51,11 +46,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) On récupère le code
       - name: Checkout du dépôt
         uses: actions/checkout@v4
 
-      # 2) Cache node_modules (test) — même key que dans le build
       - name: Cache node_modules (test)
         id: cache-node-test
         uses: actions/cache@v3
@@ -65,38 +58,31 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-modules-
 
-      # 3) Cache du binaire Cypress
       - name: Cache Cypress binaire
         id: cache-cypress-binary
         uses: actions/cache@v3
         with:
-          # Ce chemin regroupe les binaires téléchargés par Cypress
           path: ~/.cache/Cypress
           key: ${{ runner.os }}-cypress-binary-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-cypress-binary-
 
-      # 4) Setup Node.js
       - name: Setup Node.js (v18.x)
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
 
-      # 5) Installation des dépendances (test) si le cache était manquant
       - name: Installation des dépendances (test)
         if: steps.cache-node-test.outputs.cache-hit != 'true'
         run: npm ci
 
-      # 6) Build Next.js (recréation de .next) pour que le serveur puisse démarrer
       - name: Build Next.js (recréation de .next)
         run: npm run build
 
-      # 7) Installation explicite du binaire Cypress si le cache était manquant
       - name: Install Cypress binary
         if: steps.cache-cypress-binary.outputs.cache-hit != 'true'
         run: npx cypress install
 
-      # 8) Démarrage du serveur Next.js (mode production)
       - name: Démarrage du serveur Next.js
         run: |
           nohup npm run start &
@@ -104,13 +90,59 @@ jobs:
         env:
           NODE_ENV: production
 
-      # 9) Exécution des tests Cypress
       - name: Exécution des tests Cypress
         run: npx cypress run
 
-      # 10) Upload des vidéos Cypress
       - name: Upload des vidéos Cypress
         uses: actions/upload-artifact@v4
         with:
           name: cypress-videos
           path: cypress/videos
+
+  deploy:
+    name: Déploiement en prod
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'  
+    steps:
+      - name: Checkout du dépôt
+        uses: actions/checkout@v4
+
+      - name: Configurer la clé SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          # Optionnel : désactiver la vérification des hôtes si tu n'as pas ajouté manuellement le serveur dans known_hosts
+          echo -e "Host ${{ secrets.SSH_HOST }}\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+
+      - name: Déployer sur le serveur via SSH
+        uses: appleboy/ssh-action@v0.7.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            # → Ici, adapte le chemin vers ton répertoire de production
+            cd /var/www/mon-app
+
+            # Option A : Utiliser git pull directement (si le repo est cloné en prod)
+            git pull origin main
+
+            # Option B : Si tu préfères synchroniser avec rsync, remplacer par :
+            # rsync -avz --delete ./ user@serveur:/var/www/mon-app
+
+            # Installer / mettre à jour les dépendances
+            npm ci
+
+            # Rebuild (Next.js ou autre)
+            npm run build
+
+            # Redémarrer le serveur : exemple avec PM2
+            pm2 restart mon-app
+
+            # Si tu utilises systemd, ça peut être :
+            # sudo systemctl restart mon-app.service
