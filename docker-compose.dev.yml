@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  next-app:
+    image: ghcr.io/bauloup1999/next-cda241/next-app:latest
+    container_name: next-app-dev
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "8080:3000"
+    restart: unless-stopped
+
+networks:
+  webnet:
+    driver: bridge

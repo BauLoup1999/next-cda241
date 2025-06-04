@@ -68,30 +68,24 @@ jobs:
             # 1. Aller dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
-            # 2. Mettre à jour le dépôt local
-            git pull origin develop || git clone https://github.com/${{ github.repository_owner }}/next-cda241.git .
+            # 2. Mettre à jour le dépôt local sur la branche develop
+            git pull origin develop || git clone --branch develop https://github.com/${{ github.repository_owner }}/next-cda241.git .
 
             # 3. Authentification GHCR pour pull de l'image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # 4a. Arrêter et supprimer les conteneurs existants (sur le port 8080)
+            # 4a. Arrêter et supprimer tout conteneur écoutant sur le port 8080
             docker ps -q --filter "publish=8080" | xargs -r docker stop
             docker ps -aq --filter "publish=8080" | xargs -r docker rm
 
-            # 4b. Si une ancienne stack existe, la descendre (incluant orphelins)
-            docker-compose -f docker-compose.yml down --remove-orphans
+            # 4b. Descendre l'ancienne stack de test (incluant les orphelins)
+            docker-compose -f docker-compose.dev.yml down --remove-orphans
 
-            # 4c. Adapter temporairement le port de 80:3000 à 8080:3000 dans docker-compose.yml
-            sed -i 's#"80:3000"#"8080:3000"#g' docker-compose.yml
+            # 4c. Pull de l'image (tag latest)
+            docker-compose -f docker-compose.dev.yml pull
 
-            # 4d. Pull de l'image (tag latest)
-            docker-compose -f docker-compose.yml pull
-
-            # 4e. (Re)création de la stack en mode "dev" sur le port 8080
-            docker-compose -f docker-compose.yml up -d
-
-            # 4f. (Optionnel) Remettre la configuration port à 80:3000 si vous voulez stocker docker-compose.yml en l'état
-            sed -i 's#"8080:3000"#"80:3000"#g' docker-compose.yml
+            # 4d. (Re)création de la stack de test sur le port 8080
+            docker-compose -f docker-compose.dev.yml up -d
 
   deploy-prod:
     name: env prod
@@ -111,17 +105,17 @@ jobs:
             # 1. Aller dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
-            # 2. Mettre à jour le dépôt local
-            git pull origin master || git clone https://github.com/${{ github.repository_owner }}/next-cda241.git .
+            # 2. Mettre à jour le dépôt local sur la branche master
+            git pull origin master || git clone --branch master https://github.com/${{ github.repository_owner }}/next-cda241.git .
 
             # 3. Authentification GHCR pour pull de l'image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # 4a. Arrêter et supprimer les conteneurs existants (sur le port 80)
+            # 4a. Arrêter et supprimer tout conteneur écoutant sur le port 80
             docker ps -q --filter "publish=80" | xargs -r docker stop
             docker ps -aq --filter "publish=80" | xargs -r docker rm
 
-            # 4b. Descendre l'ancienne stack (prod) si elle existe
+            # 4b. Descendre l'ancienne stack de prod (incluant orphelins)
             docker-compose -f docker-compose.prod.yml down --remove-orphans
 
             # 4c. Pull de l'image (tag latest)
