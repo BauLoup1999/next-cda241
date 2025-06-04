@@ -1,9 +1,9 @@
-name: Construction, publication et déploiement Docker
+name: Build, publication et déploiement Docker
 
 on:
   push:
     branches:
-      - master   # ou "main" si votre branche par défaut s’appelle main
+      - master   # ou "main" si c'est votre branche principale
 
 permissions:
   contents: read
@@ -43,6 +43,7 @@ jobs:
           tags: |
             ghcr.io/bauloup1999/next-cda241/next-app:latest
 
+      # Optionnel : commenter cette vérification si GHCR_PAT n'est pas encore défini
       - name: Vérifier l'image poussée
         run: |
           echo "Tags disponibles pour ghcr.io/bauloup1999/next-cda241/next-app"
@@ -57,12 +58,12 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # Se placer dans le dossier de l'application sur le serveur
+            # Aller dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
             # (Optionnel) Se connecter à GHCR si l'image est privée
-            # echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # Récupérer la dernière image puis relancer la stack
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d
+            # Mettre à jour l'image puis relancer la stack
+            docker-compose -f docker-compose.prod.yml pull
+            docker-compose -f docker-compose.prod.yml up -d
