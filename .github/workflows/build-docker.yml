@@ -73,5 +73,6 @@ jobs:
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
             # 4. Mettre à jour l'image et relancer la stack via docker-compose v1
+            docker-compose -f docker-compose.prod.yml down
             docker-compose -f docker-compose.prod.yml pull
             docker-compose -f docker-compose.prod.yml up -d
