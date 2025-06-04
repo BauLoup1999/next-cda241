@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: build
+    name: Build et publication de l’image Docker
     runs-on: ubuntu-latest
 
     steps:
@@ -35,7 +35,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Construire et pousser l'image Docker
+      - name: Construire et pousser l’image Docker
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -44,15 +44,14 @@ jobs:
           tags: |
             ghcr.io/bauloup1999/next-cda241/next-app:latest
 
-      - name: Vérifier l'image poussée
+      - name: Vérifier l’image poussée
         run: |
           echo "Tags disponibles pour ghcr.io/bauloup1999/next-cda241/next-app"
           curl -H "Authorization: Bearer ${{ secrets.GHCR_PAT }}" \
                -s https://ghcr.io/v2/bauloup1999/next-cda241/next-app/tags/list | jq .
 
   deploy-test:
-    name: env test
-    if: github.ref == 'refs/heads/develop'
+    name: Déploiement Test (port 8080)
     needs: build
     runs-on: ubuntu-latest
 
@@ -65,31 +64,32 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # 1. Aller dans le dossier de l'application sur le serveur
+            # 1. Aller dans le dossier de l’application
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
             # 2. Mettre à jour le dépôt local sur la branche develop
-            git pull origin develop || git clone --branch develop https://github.com/${{ github.repository_owner }}/next-cda241.git .
+            git fetch origin
+            git checkout develop
+            git pull origin develop
 
-            # 3. Authentification GHCR pour pull de l'image privée
+            # 3. Authentification GHCR pour pull de l’image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
             # 4a. Arrêter et supprimer tout conteneur écoutant sur le port 8080
             docker ps -q --filter "publish=8080" | xargs -r docker stop
             docker ps -aq --filter "publish=8080" | xargs -r docker rm
 
-            # 4b. Descendre l'ancienne stack de test (incluant les orphelins)
+            # 4b. Descendre l’ancienne stack de test, y compris orphelins
             docker-compose -f docker-compose.dev.yml down --remove-orphans
 
-            # 4c. Pull de l'image (tag latest)
+            # 4c. Pull de l’image (tag latest)
             docker-compose -f docker-compose.dev.yml pull
 
             # 4d. (Re)création de la stack de test sur le port 8080
             docker-compose -f docker-compose.dev.yml up -d
 
   deploy-prod:
-    name: env prod
-    if: github.ref == 'refs/heads/master'
+    name: Déploiement Prod (port 80)
     needs: build
     runs-on: ubuntu-latest
 
@@ -102,23 +102,25 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # 1. Aller dans le dossier de l'application sur le serveur
+            # 1. Aller dans le dossier de l’application
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
             # 2. Mettre à jour le dépôt local sur la branche master
-            git pull origin master || git clone --branch master https://github.com/${{ github.repository_owner }}/next-cda241.git .
+            git fetch origin
+            git checkout master
+            git pull origin master
 
-            # 3. Authentification GHCR pour pull de l'image privée
+            # 3. Authentification GHCR pour pull de l’image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
             # 4a. Arrêter et supprimer tout conteneur écoutant sur le port 80
             docker ps -q --filter "publish=80" | xargs -r docker stop
             docker ps -aq --filter "publish=80" | xargs -r docker rm
 
-            # 4b. Descendre l'ancienne stack de prod (incluant orphelins)
+            # 4b. Descendre l’ancienne stack de prod, y compris orphelins
             docker-compose -f docker-compose.prod.yml down --remove-orphans
 
-            # 4c. Pull de l'image (tag latest)
+            # 4c. Pull de l’image (tag latest)
             docker-compose -f docker-compose.prod.yml pull
 
             # 4d. (Re)création de la stack de prod sur le port 80
