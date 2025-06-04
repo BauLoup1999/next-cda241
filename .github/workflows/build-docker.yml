@@ -58,29 +58,33 @@ jobs:
 
     steps:
       - name: Déployer sur le serveur de test via SSH
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
+            # 1. Aller dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
-            # Si le repo n'existe pas encore, on le clone en develop
-            if [ ! -d ".git" ]; then
-              git clone --branch develop https://github.com/${{ github.repository_owner }}/next-cda241.git .
-            else
-              git fetch origin develop
-              git checkout develop
-              git pull origin develop
-            fi
+            # 2. Mettre à jour le dépôt local sur la branche develop
+            git pull origin develop || git clone --branch develop https://github.com/${{ github.repository_owner }}/next-cda241.git .
 
-            # Authentification GHCR pour pull de l'image privée
+            # 3. Authentification GHCR pour pull de l'image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # Pull + up: 
+            # 4a. Arrêter et supprimer tout conteneur écoutant sur le port 8080
+            docker ps -q --filter "publish=8080" | xargs -r docker stop
+            docker ps -aq --filter "publish=8080" | xargs -r docker rm
+
+            # 4b. Descendre l'ancienne stack de test (incluant les orphelins)
+            docker-compose -f docker-compose.dev.yml down --remove-orphans
+
+            # 4c. Pull de l'image (tag latest)
             docker-compose -f docker-compose.dev.yml pull
+
+            # 4d. (Re)création de la stack de test sur le port 8080
             docker-compose -f docker-compose.dev.yml up -d
 
   deploy-prod:
@@ -91,27 +95,31 @@ jobs:
 
     steps:
       - name: Déployer sur le serveur de prod via SSH
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
+            # 1. Aller dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
-            # Si le repo n'existe pas encore, on le clone en master
-            if [ ! -d ".git" ]; then
-              git clone --branch master https://github.com/${{ github.repository_owner }}/next-cda241.git .
-            else
-              git fetch origin master
-              git checkout master
-              git pull origin master
-            fi
+            # 2. Mettre à jour le dépôt local sur la branche master
+            git pull origin master || git clone --branch master https://github.com/${{ github.repository_owner }}/next-cda241.git .
 
-            # Authentification GHCR pour pull de l'image privée
+            # 3. Authentification GHCR pour pull de l'image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # Pull + up: 
+            # 4a. Arrêter et supprimer tout conteneur écoutant sur le port 80
+            docker ps -q --filter "publish=80" | xargs -r docker stop
+            docker ps -aq --filter "publish=80" | xargs -r docker rm
+
+            # 4b. Descendre l'ancienne stack de prod (incluant orphelins)
+            docker-compose -f docker-compose.prod.yml down --remove-orphans
+
+            # 4c. Pull de l'image (tag latest)
             docker-compose -f docker-compose.prod.yml pull
+
+            # 4d. (Re)création de la stack de prod sur le port 80
             docker-compose -f docker-compose.prod.yml up -d
