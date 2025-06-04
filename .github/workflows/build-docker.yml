@@ -63,11 +63,15 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
+            # 1. Se placer dans le dossier de l'application
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
-            # Authentification GHCR pour pull d'une image privée
+            # 2. Mettre à jour le dépôt Git (prérequis pour avoir docker-compose.prod.yml à jour)
+            git pull origin master || git clone https://github.com/${{ github.repository_owner }}/next-cda241.git .
+
+            # 3. Authentification GHCR pour pull d'une image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # Mettre à jour l'image et redémarrer la stack via docker-compose v1
+            # 4. Mettre à jour l'image et relancer la stack via docker-compose v1
             docker-compose -f docker-compose.prod.yml pull
             docker-compose -f docker-compose.prod.yml up -d
