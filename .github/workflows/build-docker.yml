@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Construire et publier l'image Docker
+    name: build
     runs-on: ubuntu-latest
 
     steps:
@@ -51,7 +51,7 @@ jobs:
                -s https://ghcr.io/v2/bauloup1999/next-cda241/next-app/tags/list | jq .
 
   deploy-test:
-    name: Déployer l'environnement de test (branch develop)
+    name: env test
     if: github.ref == 'refs/heads/develop'
     needs: build
     runs-on: ubuntu-latest
@@ -94,7 +94,7 @@ jobs:
             sed -i 's#"8080:3000"#"80:3000"#g' docker-compose.yml
 
   deploy-prod:
-    name: Déployer l'environnement de production (branch master)
+    name: env prod
     if: github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
