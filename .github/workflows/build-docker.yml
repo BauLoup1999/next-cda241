@@ -10,8 +10,8 @@ permissions:
   packages: write
 
 jobs:
-  build_and_deploy:
-    name: Construire, publier et déployer
+  build:
+    name: Construire et publier l'image Docker
     runs-on: ubuntu-latest
 
     steps:
@@ -43,14 +43,19 @@ jobs:
           tags: |
             ghcr.io/bauloup1999/next-cda241/next-app:latest
 
-      # Optionnel : commenter cette vérification si GHCR_PAT n'est pas encore défini
       - name: Vérifier l'image poussée
         run: |
           echo "Tags disponibles pour ghcr.io/bauloup1999/next-cda241/next-app"
           curl -H "Authorization: Bearer ${{ secrets.GHCR_PAT }}" \
                -s https://ghcr.io/v2/bauloup1999/next-cda241/next-app/tags/list | jq .
 
-      - name: Déployer la stack sur le serveur via SSH
+  deploy:
+    name: Déployer la stack via SSH
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Se connecter au serveur et mettre à jour la stack
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -61,9 +66,9 @@ jobs:
             # Aller dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
-            # (Optionnel) Se connecter à GHCR si l'image est privée
+            # S'authentifier auprès de GHCR pour pouvoir pull l'image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # Mettre à jour l'image puis relancer la stack
-            docker-compose -f docker-compose.prod.yml pull
-            docker-compose -f docker-compose.prod.yml up -d
+            # Mettre à jour l'image puis relancer la stack via Docker Compose v2
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
