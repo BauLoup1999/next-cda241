@@ -1,0 +1,16 @@
+services:
+  next-app:
+    image: ghcr.io/bauloup1999/next-cda241/next-app:latest
+    container_name: next-app-prod
+    environment:
+      - NODE_ENV=production
+      # Ajoutez ici d’autres variables d’environnement si nécessaire, par ex. :
+      # - API_URL=https://api.mon-domaine.com
+      # - DATABASE_URL=postgres://user:pass@db:5432/ma_base
+    ports:
+      - "80:3000"
+    restart: unless-stopped
+
+networks:
+  webnet:
+    driver: bridge
