@@ -63,12 +63,11 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # Se placer dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
-            # S'authentifier auprès de GHCR pour pouvoir pull l'image privée
+            # Authentification GHCR pour pull d'une image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # Mettre à jour l'image puis relancer la stack avec docker-compose
+            # Mettre à jour l'image et redémarrer la stack via docker-compose v1
             docker-compose -f docker-compose.prod.yml pull
             docker-compose -f docker-compose.prod.yml up -d
