@@ -51,7 +51,6 @@ jobs:
 
   deploy:
     name: Déployer la stack via SSH
-    needs: build
     runs-on: ubuntu-latest
 
     steps:
