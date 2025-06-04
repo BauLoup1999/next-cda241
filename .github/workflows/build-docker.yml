@@ -3,7 +3,7 @@ name: Build, publication et déploiement Docker
 on:
   push:
     branches:
-      - master   # ou "main" si c'est votre branche principale
+      - master   # ou "main" si votre branche principale s’appelle main
 
 permissions:
   contents: read
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Se connecter au serveur et mettre à jour la stack
+      - name: Déployer sur le serveur via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -63,12 +63,12 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # Aller dans le dossier de l'application sur le serveur
+            # Se placer dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
             # S'authentifier auprès de GHCR pour pouvoir pull l'image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # Mettre à jour l'image puis relancer la stack via Docker Compose v2
+            # Mettre à jour l'image puis relancer la stack avec Docker Compose v2
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
