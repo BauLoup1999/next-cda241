@@ -50,7 +50,8 @@ jobs:
                -s https://ghcr.io/v2/bauloup1999/next-cda241/next-app/tags/list | jq .
 
   deploy:
-    name: Déployer la stack via SSH
+    name: Déployer la stack via SSH (sans Docker Compose)
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
@@ -62,12 +63,21 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # Se placer dans le dossier de l'application sur le serveur
-            cd /home/${{ secrets.SSH_USER }}/next-cda241
+            # Aller dans le dossier de l'application (optionnel si vous gérez ailleurs)
+            cd /home/${{ secrets.SSH_USER }}/next-cda241 || true
 
             # S'authentifier auprès de GHCR pour pouvoir pull l'image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # Mettre à jour l'image puis relancer la stack avec Docker Compose v2
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d
+            # Récupérer la nouvelle image
+            docker pull ghcr.io/bauloup1999/next-cda241/next-app:latest
+
+            # Arrêter et supprimer l'ancien conteneur (silencieux si absent)
+            docker stop next-app || true
+            docker rm next-app  || true
+
+            # Lancer le nouveau conteneur en production
+            docker run -d \
+              --name next-app \
+              -p 80:3000 \
+              ghcr.io/bauloup1999/next-cda241/next-app:latest
