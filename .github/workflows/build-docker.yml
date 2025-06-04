@@ -1,9 +1,10 @@
-name: Build, publication et déploiement Docker
+name: CI/CD Docker (Test & Prod)
 
 on:
   push:
     branches:
-      - master   # ou "main" si votre branche principale s’appelle main
+      - develop
+      - master
 
 permissions:
   contents: read
@@ -49,13 +50,14 @@ jobs:
           curl -H "Authorization: Bearer ${{ secrets.GHCR_PAT }}" \
                -s https://ghcr.io/v2/bauloup1999/next-cda241/next-app/tags/list | jq .
 
-  deploy:
-    name: Déployer la stack via SSH
+  deploy-test:
+    name: Déployer l'environnement de test (branch develop)
+    if: github.ref == 'refs/heads/develop'
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Déployer sur le serveur via SSH
+      - name: Déployer sur le serveur de test via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -63,16 +65,67 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
-            # 1. Se placer dans le dossier de l'application
+            # 1. Aller dans le dossier de l'application sur le serveur
             cd /home/${{ secrets.SSH_USER }}/next-cda241
 
-            # 2. Mettre à jour le dépôt Git (prérequis pour avoir docker-compose.prod.yml à jour)
-            git pull origin master || git clone https://github.com/${{ github.repository_owner }}/next-cda241.git .
+            # 2. Mettre à jour le dépôt local
+            git pull origin develop || git clone https://github.com/${{ github.repository_owner }}/next-cda241.git .
 
-            # 3. Authentification GHCR pour pull d'une image privée
+            # 3. Authentification GHCR pour pull de l'image privée
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
 
-            # 4. Mettre à jour l'image et relancer la stack via docker-compose v1
-            docker-compose -f docker-compose.prod.yml down
+            # 4a. Arrêter et supprimer les conteneurs existants (sur le port 8080)
+            docker ps -q --filter "publish=8080" | xargs -r docker stop
+            docker ps -aq --filter "publish=8080" | xargs -r docker rm
+
+            # 4b. Si une ancienne stack existe, la descendre (incluant orphelins)
+            docker-compose -f docker-compose.yml down --remove-orphans
+
+            # 4c. Adapter temporairement le port de 80:3000 à 8080:3000 dans docker-compose.yml
+            sed -i 's#"80:3000"#"8080:3000"#g' docker-compose.yml
+
+            # 4d. Pull de l'image (tag latest)
+            docker-compose -f docker-compose.yml pull
+
+            # 4e. (Re)création de la stack en mode "dev" sur le port 8080
+            docker-compose -f docker-compose.yml up -d
+
+            # 4f. (Optionnel) Remettre la configuration port à 80:3000 si vous voulez stocker docker-compose.yml en l'état
+            sed -i 's#"8080:3000"#"80:3000"#g' docker-compose.yml
+
+  deploy-prod:
+    name: Déployer l'environnement de production (branch master)
+    if: github.ref == 'refs/heads/master'
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Déployer sur le serveur de prod via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          script: |
+            # 1. Aller dans le dossier de l'application sur le serveur
+            cd /home/${{ secrets.SSH_USER }}/next-cda241
+
+            # 2. Mettre à jour le dépôt local
+            git pull origin master || git clone https://github.com/${{ github.repository_owner }}/next-cda241.git .
+
+            # 3. Authentification GHCR pour pull de l'image privée
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u bauloup1999 --password-stdin
+
+            # 4a. Arrêter et supprimer les conteneurs existants (sur le port 80)
+            docker ps -q --filter "publish=80" | xargs -r docker stop
+            docker ps -aq --filter "publish=80" | xargs -r docker rm
+
+            # 4b. Descendre l'ancienne stack (prod) si elle existe
+            docker-compose -f docker-compose.prod.yml down --remove-orphans
+
+            # 4c. Pull de l'image (tag latest)
             docker-compose -f docker-compose.prod.yml pull
+
+            # 4d. (Re)création de la stack de prod sur le port 80
             docker-compose -f docker-compose.prod.yml up -d
