@@ -52,6 +52,8 @@ jobs:
 
   deploy-test:
     name: env test
+    environment:
+      name: test
     if: github.ref == 'refs/heads/develop'
     needs: build
     runs-on: ubuntu-latest
@@ -89,6 +91,8 @@ jobs:
 
   deploy-prod:
     name: env prod
+    environment:
+      name: prod
     if: github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
